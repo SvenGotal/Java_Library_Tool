@@ -1,5 +1,6 @@
 package hr.sven.seminarski_java;
 
+import com.mysql.cj.x.protobuf.MysqlxCursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,11 +120,6 @@ public class Database {
             return null;
         }
 
-    }
-    public void DisplayData(Vector data, Vector columns, JTable table){
-        DefaultTableModel model = new DefaultTableModel(data, columns);
-        table.setModel(model);
-        log.info("Table successfully formatted.");
     }
     public void InsertUser(String id, String name){
         try{

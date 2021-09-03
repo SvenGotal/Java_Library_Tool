@@ -12,11 +12,21 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import java.sql.Connection;
-import java.sql.*;
 import java.util.Vector;
 
 public class Library {
+
+    /* Resources */
+    private static final Logger log = LoggerFactory.getLogger("libraryLog");
+    private Database context;
+    private static JMenuBar menu;
+    /* ======================================================================================= ***/
+
+    /* General Queries */
+    String getBooks = "SELECT id, book_name, book_author, book_status, user.user_name FROM book INNER JOIN user ON book.book_user = user.user_id";
+    String getUsers = "SELECT * FROM user";
+    /* ======================================================================================= ***/
+
     private JPanel panelData;
     private JTable table1;
     private JButton buttonExit;
@@ -30,25 +40,9 @@ public class Library {
     private JButton buttonUsers;
     private JButton buttonRentBook;
     private JButton buttonReturnBook;
-    private static JMenuBar menu;
-
-    /* Resources */
-    private final String connectionString;
-    private Connection conn;
-    private ResultSet rs;
-    private Statement stmt;
-    private static final Logger log = LoggerFactory.getLogger("libraryLog");
-    /* ======================================================================================= ***/
-
-    /* General Queries */
-    String getBooks = "SELECT id, book_name, book_author, book_status, user.user_name FROM book INNER JOIN user ON book.book_user = user.user_id";
-    String getUsers = "SELECT * FROM user";
-    /* ======================================================================================= ***/
 
     public Library() {
-        /* Database Configuration */
-        connectionString = "jdbc:mysql://localhost:3306/library?user=root";
-
+        context = new Database();
         /* Menu bar */
         setupMenuBar();
         /* ======================================================================================= ***/
@@ -57,14 +51,9 @@ public class Library {
         buttonExit.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                try {
-                    if (conn != null) {
-                        conn.close();
-                        log.info("Closing Connection;");
-                    }
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                    log.error("Unable to close DB connection;");
+                if (context != null) {
+                    context.CloseConnection();
+                    log.info("Closing Connection;");
                 }
                 System.exit(0);
 
@@ -73,14 +62,14 @@ public class Library {
         buttonBooks.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                booksData();
+                booksData(getBooks);
 
             }
         });
         buttonUsers.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                usersData();
+                usersData(getUsers);
             }
         });
         buttonSearchBooks.addActionListener(new ActionListener() {
@@ -92,17 +81,9 @@ public class Library {
                     return;
                 }
 
-                OpenConnection();
                 String statement = getBooks + " WHERE book_name LIKE " + "'%" + search + "%'";
-                Vector data = getData(statement);
-                Vector columns = new Vector();
-                columns.add("Title");
-                columns.add("Author");
-                columns.add("Status");
-                columns.add("Member");
-
+                booksData(statement);
                 textFieldBooks.setText("");
-                DisplayData(data,columns,table1);
             }
         });
         buttonSearchUsers.addActionListener(new ActionListener() {
@@ -110,19 +91,13 @@ public class Library {
             public void actionPerformed(ActionEvent actionEvent) {
                 String search = textFieldUsers.getText();
 
-                if (search == "" || search == null) {
+                if (search.equals("") || search.equals(null)) {
                     return;
                 }
-
-                OpenConnection();
                 String statement = getUsers + " WHERE user_name LIKE " + "'%" + search + "%'";
-                Vector data = getData(statement);
-                Vector columns = new Vector();
-                columns.add("Id");
-                columns.add("Member");
-
+                usersData(statement);
                 textFieldUsers.setText("");
-                DisplayData(data,columns,table1);
+
 
             }
         });
@@ -130,7 +105,6 @@ public class Library {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 AddUserDialog user = new AddUserDialog();
-
 
 
             }
@@ -145,15 +119,13 @@ public class Library {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
 
-                if(rowIsSelected(table1)){
+                if (rowIsSelected(table1)) {
                     String id = getSelectedRowId(table1);
                     BookRentalDialog rental = new BookRentalDialog();
                     rental.SetBookId(id);
 
 
-
-                }
-                else{
+                } else {
                     JOptionPane.showOptionDialog(
                             panelData,
                             "Please select book in the table.",
@@ -161,7 +133,7 @@ public class Library {
                             JOptionPane.CANCEL_OPTION,
                             JOptionPane.WARNING_MESSAGE,
                             null,
-                            new String[] {"Cancel"},
+                            new String[]{"Cancel"},
                             "Cancel"
                     );
                 }
@@ -169,21 +141,15 @@ public class Library {
 
             }
         });
-
-
-        /* ======================================================================================= ***/
-
         buttonReturnBook.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
 
-                if(rowIsSelected(table1)) {
+                if (rowIsSelected(table1)) {
                     String id = getSelectedRowId(table1);
-                    Database context = new Database();
+                    context = new Database();
                     context.ReturnBook(id);
-                    context.CloseConnection();
-                }
-                else{
+                } else {
                     JOptionPane.showOptionDialog(
                             panelData,
                             "Please select book in the table.",
@@ -191,14 +157,13 @@ public class Library {
                             JOptionPane.CANCEL_OPTION,
                             JOptionPane.WARNING_MESSAGE,
                             null,
-                            new String[] {"Cancel"},
+                            new String[]{"Cancel"},
                             "Cancel"
                     );
                 }
-
-
             }
         });
+        /* ======================================================================================= ***/
     }
 
     /* Main */
@@ -213,84 +178,15 @@ public class Library {
     /* ======================================================================================= ***/
 
     /* Helper methods */
-    private void OpenConnection() {
-        try {
-            if (conn == null)
-                conn = DriverManager.getConnection(connectionString);
-
-            log.info("Connection successful.");
-        } catch (SQLException e) {
-            e.printStackTrace();
-            log.error("Unable to open connection;");
-        }
-    }
-    private Vector getData(String statement) {
-
-        try {
-            stmt = conn.createStatement();
-            rs = stmt.executeQuery(statement);
-            int colCount = rs.getMetaData().getColumnCount();
-
-            Vector data = parseData(colCount);
-            rs.close();
-
-            log.info("Data successfully extracted.");
-
-            return data;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            log.error("Unable to retrieve data.");
-            return null;
-        }
-    }
-    private Vector getHeaders(int colCount) {
-        try {
-            Vector columns = new Vector(colCount);
-            for (int i = 1; i <= colCount; ++i) {
-                columns.add(rs.getMetaData().getColumnName(i));
-            }
-
-            log.info("Headers successfully extracted from table.");
-
-            return columns;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            log.error("Unable to retrieve header data");
-            return null;
-        }
-    }
-    private Vector parseData(int colCount) {
-        try {
-            Vector data = new Vector();
-
-            while (rs.next()) {
-                Vector row = new Vector(colCount);
-                for (int i = 1; i <= colCount; i++) {
-                    //row[i-1] = rs.getObject(i);
-                    row.add(rs.getString(i));
-                }
-                data.add(row);
-            }
-
-            log.info("Data successfully parsed from RowSet.");
-
-            return data;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            log.error("Unable to parse data.");
-            return null;
-        }
-
-    }
-    private void DisplayData(Vector data, Vector columns, JTable table){
+    private void DisplayData(Vector data, Vector columns, JTable table) {
         DefaultTableModel model = new DefaultTableModel(data, columns);
         table.setModel(model);
         log.info("Table successfully formatted.");
     }
-    private void booksData(){
-        OpenConnection();
 
-        Vector data = getData(getBooks);
+    private void booksData(String statement) {
+
+        Vector data = context.getData(statement);
         Vector columns = new Vector();
         columns.add("Book Id");
         columns.add("Title");
@@ -300,17 +196,18 @@ public class Library {
 
         DisplayData(data, columns, table1);
     }
-    private void usersData(){
-        OpenConnection();
 
-        Vector data = getData(getUsers);
+    private void usersData(String statement) {
+
+        Vector data = context.getData(statement);
         Vector columns = new Vector();
         columns.add("Id");
         columns.add("Member");
 
         DisplayData(data, columns, table1);
     }
-    private void setupMenuBar(){
+
+    private void setupMenuBar() {
         menu = new JMenuBar();
 
         JMenu fileMenu = new JMenu("File");
@@ -318,11 +215,11 @@ public class Library {
 
         JMenuItem booksItem = new JMenuItem("Books");
         booksItem.setToolTipText("Show all books in the library.");
-        booksItem.addActionListener(actionEvent ->  booksData());
+        booksItem.addActionListener(actionEvent -> booksData(getBooks));
 
         JMenuItem usersItem = new JMenuItem("Members");
         usersItem.setToolTipText("Show all library members.");
-        usersItem.addActionListener(actionEvent -> usersData());
+        usersItem.addActionListener(actionEvent -> usersData(getUsers));
 
         JMenuItem exitItem = new JMenuItem("Exit");
         exitItem.setToolTipText("Exit application.");
@@ -334,14 +231,16 @@ public class Library {
         menu.add(fileMenu);
 
     }
-    private String getSelectedRowId(JTable table){
+
+    private String getSelectedRowId(JTable table) {
 
         int rowNum = table.getSelectedRow();
         int colNum = 0;
 
         return table.getValueAt(rowNum, colNum).toString();
     }
-    private boolean rowIsSelected(JTable table){
+
+    private boolean rowIsSelected(JTable table) {
         return !(table.getSelectedRow() == -1);
     }
     /* ======================================================================================= ***/
