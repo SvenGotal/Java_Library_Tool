@@ -1,0 +1,19 @@
+CREATE DATABASE `library` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+
+CREATE TABLE `book` (
+  `id` int NOT NULL,
+  `book_name` varchar(45) NOT NULL,
+  `book_author` varchar(30) DEFAULT NULL,
+  `book_status` varchar(15) DEFAULT NULL,
+  `book_user` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `book_user_idx` (`book_user`),
+  CONSTRAINT `fk_book_user` FOREIGN KEY (`book_user`) REFERENCES `user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `user` (
+  `user_id` int NOT NULL,
+  `user_name` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
